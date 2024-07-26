@@ -32,6 +32,7 @@ def build_loss(cfg):
 
 
 def build_fusion_model(cfg, train_cfg=None, test_cfg=None):
+    print(f'cfg : {cfg}\n\n')
     return FUSIONMODELS.build(
         cfg, default_args=dict(train_cfg=train_cfg, test_cfg=test_cfg)
     )

@@ -10,7 +10,8 @@ from mmcv.parallel import MMDistributedDataParallel
 from mmcv.runner import load_checkpoint
 from torchpack import distributed as dist
 from torchpack.utils.config import configs
-from torchpack.utils.tqdm import tqdm
+# from torchpack.utils.tqdm import tqdm
+from tqdm import tqdm
 
 from mmdet3d.core import LiDARInstance3DBoxes
 from mmdet3d.core.utils import visualize_camera, visualize_lidar, visualize_map
@@ -36,7 +37,7 @@ def recursive_eval(obj, globals=None):
 
 
 def main() -> None:
-    dist.init()
+    # dist.init()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("config", metavar="FILE")
@@ -50,6 +51,7 @@ def main() -> None:
     args, opts = parser.parse_known_args()
 
     configs.load(args.config, recursive=True)
+    print(configs)
     configs.update(opts)
 
     cfg = Config(recursive_eval(configs), filename=args.config)
@@ -63,30 +65,31 @@ def main() -> None:
         dataset,
         samples_per_gpu=1,
         workers_per_gpu=cfg.data.workers_per_gpu,
-        dist=True,
+        dist=False,
         shuffle=False,
     )
 
     # build the model and load checkpoint
     if args.mode == "pred":
         model = build_model(cfg.model)
-        load_checkpoint(model, args.checkpoint, map_location="cpu")
+        load_checkpoint(model, args.checkpoint, map_location="cuda")
 
-        model = MMDistributedDataParallel(
-            model.cuda(),
-            device_ids=[torch.cuda.current_device()],
-            broadcast_buffers=False,
-        )
+        # model = MMDistributedDataParallel(
+        #     model.cuda(),
+        #     device_ids=[torch.cuda.current_device()],
+        #     broadcast_buffers=False,
+        # )
+
+        model.cuda()
         model.eval()
 
     for data in tqdm(dataflow):
         metas = data["metas"].data[0][0]
         name = "{}-{}".format(metas["timestamp"], metas["token"])
-
+        
         if args.mode == "pred":
             with torch.inference_mode():
                 outputs = model(**data)
-
         if args.mode == "gt" and "gt_bboxes_3d" in data:
             bboxes = data["gt_bboxes_3d"].data[0][0].tensor.numpy()
             labels = data["gt_labels_3d"].data[0][0].numpy()

@@ -86,18 +86,27 @@ def create_nuscenes_infos(root_path,
         data = dict(infos=train_nusc_infos, metadata=metadata)
         info_path = osp.join(root_path,
                              '{}_infos_test_radar.pkl'.format(info_prefix))
+        
+        
         mmcv.dump(data, info_path)
     else:
         print(info_prefix)
         print('train sample: {}, val sample: {}'.format(
             len(train_nusc_infos), len(val_nusc_infos)))
         data = dict(infos=train_nusc_infos, metadata=metadata)
-        info_path = osp.join(info_prefix,
-                             '{}_infos_train_radar.pkl'.format(info_prefix))
+        # info_path = osp.join(info_prefix,
+        #                      '{}_infos_train_radar.pkl'.format(info_prefix))
+        
+        info_path = f'/mnt/e/bevfusion/data/{info_prefix}/{info_prefix}_infos_train.pkl'
+        
+        print(f'**************{info_path}***********')
         mmcv.dump(data, info_path)
+
         data['infos'] = val_nusc_infos
-        info_val_path = osp.join(info_prefix,
-                                 '{}_infos_val_radar.pkl'.format(info_prefix))
+        # info_val_path = osp.join(info_prefix,
+        #                          '{}_infos_val_radar.pkl'.format(info_prefix))
+        
+        info_val_path = f'/mnt/e/bevfusion/data/{info_prefix}/{info_prefix}_infos_val.pkl'
         mmcv.dump(data, info_val_path)
 
 

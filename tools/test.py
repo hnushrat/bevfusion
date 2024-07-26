@@ -18,6 +18,7 @@ from mmdet.apis import multi_gpu_test, set_random_seed
 from mmdet.datasets import replace_ImageToTensor
 from mmdet3d.utils import recursive_eval
 
+# os.environ['NCCL_IB_DISABLE'] = '1'
 
 def parse_args():
     parser = argparse.ArgumentParser(description="MMDet test (and eval) a model")
@@ -112,10 +113,11 @@ def parse_args():
 
 def main():
     args = parse_args()
-    dist.init()
+    # dist.init()
 
     torch.backends.cudnn.benchmark = True
-    torch.cuda.set_device(dist.local_rank())
+    # torch.cuda.set_device(dist.local_rank())
+    torch.cuda.set_device(0)
 
     assert args.out or args.eval or args.format_only or args.show or args.show_dir, (
         "Please specify at least one operation (save/eval/format/show the "
@@ -143,12 +145,15 @@ def main():
     # in case the test dataset is concatenated
     samples_per_gpu = 1
     if isinstance(cfg.data.test, dict):
+        
         cfg.data.test.test_mode = True
-        samples_per_gpu = cfg.data.test.pop("samples_per_gpu", 1)
+        # samples_per_gpu = cfg.data.test.pop("samples_per_gpu", 1)
+        samples_per_gpu = 1
         if samples_per_gpu > 1:
             # Replace 'ImageToTensor' to 'DefaultFormatBundle'
             cfg.data.test.pipeline = replace_ImageToTensor(cfg.data.test.pipeline)
     elif isinstance(cfg.data.test, list):
+        
         for ds_cfg in cfg.data.test:
             ds_cfg.test_mode = True
         samples_per_gpu = max(
@@ -159,12 +164,12 @@ def main():
                 ds_cfg.pipeline = replace_ImageToTensor(ds_cfg.pipeline)
 
     # init distributed env first, since logger depends on the dist info.
-    distributed = True
+    distributed = False
 
     # set random seeds
     if args.seed is not None:
         set_random_seed(args.seed, deterministic=args.deterministic)
-
+    
     # build the dataloader
     dataset = build_dataset(cfg.data.test)
     data_loader = build_dataloader(
@@ -175,24 +180,32 @@ def main():
         shuffle=False,
     )
 
-    # build the model and load checkpoint
+   # build the model and load checkpoint
     cfg.model.train_cfg = None
+    print('aaaaa')
     model = build_model(cfg.model, test_cfg=cfg.get("test_cfg"))
+    print('bbbbb')
+
+    
+
     fp16_cfg = cfg.get("fp16", None)
     if fp16_cfg is not None:
         wrap_fp16_model(model)
     checkpoint = load_checkpoint(model, args.checkpoint, map_location="cpu")
     if args.fuse_conv_bn:
         model = fuse_conv_bn(model)
+
     # old versions did not save class info in checkpoints, this walkaround is
     # for backward compatibility
     if "CLASSES" in checkpoint.get("meta", {}):
         model.CLASSES = checkpoint["meta"]["CLASSES"]
     else:
         model.CLASSES = dataset.CLASSES
-
+    '''
     if not distributed:
         model = MMDataParallel(model, device_ids=[0])
+        print('////')
+        model = model.cuda()
         outputs = single_gpu_test(model, data_loader)
     else:
         model = MMDistributedDataParallel(
@@ -201,7 +214,11 @@ def main():
             broadcast_buffers=False,
         )
         outputs = multi_gpu_test(model, data_loader, args.tmpdir, args.gpu_collect)
-
+    '''
+    print('////')
+    model = model.cuda()
+    outputs = single_gpu_test(model, data_loader)
+    
     rank, _ = get_dist_info()
     if rank == 0:
         if args.out:

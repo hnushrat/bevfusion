@@ -44,6 +44,7 @@ class BEVFusion(Base3DFusionModel):
             )
         if encoders.get("lidar") is not None:
             if encoders["lidar"]["voxelize"].get("max_num_points", -1) > 0:
+                
                 voxelize_module = Voxelization(**encoders["lidar"]["voxelize"])
             else:
                 voxelize_module = DynamicScatter(**encoders["lidar"]["voxelize"])
@@ -53,6 +54,7 @@ class BEVFusion(Base3DFusionModel):
                     "backbone": build_backbone(encoders["lidar"]["backbone"]),
                 }
             )
+            print(self.encoders['lidar']['voxelize'])
             self.voxelize_reduce = encoders["lidar"].get("voxelize_reduce", True)
 
         if encoders.get("radar") is not None:
@@ -67,12 +69,11 @@ class BEVFusion(Base3DFusionModel):
                 }
             )
             self.voxelize_reduce = encoders["radar"].get("voxelize_reduce", True)
-
         if fuser is not None:
             self.fuser = build_fuser(fuser)
         else:
             self.fuser = None
-
+        
         self.decoder = nn.ModuleDict(
             {
                 "backbone": build_backbone(decoder["backbone"]),
@@ -83,10 +84,11 @@ class BEVFusion(Base3DFusionModel):
         for name in heads:
             if heads[name] is not None:
                 self.heads[name] = build_head(heads[name])
-
+        
         if "loss_scale" in kwargs:
             self.loss_scale = kwargs["loss_scale"]
         else:
+            
             self.loss_scale = dict()
             for name in heads:
                 if heads[name] is not None:
@@ -149,9 +151,14 @@ class BEVFusion(Base3DFusionModel):
         return x
     
     def extract_features(self, x, sensor) -> torch.Tensor:
-        feats, coords, sizes = self.voxelize(x, sensor)
+        # print(f'type of points : {type(x)}\npoints : {x._data}\nsensor : {sensor}\n\n')
+        print('$$$')
+        feats, coords, sizes = self.voxelize(x._data, sensor)
+        print('HERE!')
         batch_size = coords[-1, 0] + 1
+        print(f'extracted : \n batch size : {batch_size}\n\n')
         x = self.encoders[sensor]["backbone"](feats, coords, batch_size, sizes=sizes)
+        print(f'extracted : \n batch size : {batch_size}\nx : {x}\n')
         return x
     
     # def extract_lidar_features(self, x) -> torch.Tensor:
@@ -170,8 +177,16 @@ class BEVFusion(Base3DFusionModel):
     @force_fp32()
     def voxelize(self, points, sensor):
         feats, coords, sizes = [], [], []
+        # print(f'points before : {points}')
+        points = points[0]
+        # print(f'points after : {points}')
+        # points = torch.unsqueeze(points, dim = 0)
+        # print(points, points.shape)
         for k, res in enumerate(points):
+            # print(f'res shape : {res.shape}\nself.encoders[sensor] : {self.encoders[sensor]}')
+            print(f'k is : {k}\nres is : {res}')
             ret = self.encoders[sensor]["voxelize"](res)
+            print(f'ret is : {ret}')
             if len(ret) == 3:
                 # hard voxelize
                 f, c, n = ret
@@ -183,7 +198,7 @@ class BEVFusion(Base3DFusionModel):
             coords.append(F.pad(c, (1, 0), mode="constant", value=k))
             if n is not None:
                 sizes.append(n)
-
+        print(f'feats : {feats}\ncoords : {coords}')
         feats = torch.cat(feats, dim=0)
         coords = torch.cat(coords, dim=0)
         if len(sizes) > 0:

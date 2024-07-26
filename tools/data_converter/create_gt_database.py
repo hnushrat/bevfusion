@@ -150,6 +150,9 @@ def create_groundtruth_database(
     dataset_cfg = dict(
         type=dataset_class_name, dataset_root=data_path, ann_file=info_path
     )
+
+    # print('$$$$$$$$$',data_path)
+
     if dataset_class_name == "KittiDataset":
         dataset_cfg.update(
             test_mode=False,
